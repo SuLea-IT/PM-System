@@ -4,3 +4,4 @@ node_modules/
 # Other ignores
 .DS_Store
 dist/
+uploads/
