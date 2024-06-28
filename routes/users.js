@@ -56,6 +56,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({code: 400, data: null, msg: '缺少必要的字段'});
     }
 
+
     const [rows] = await db.query('SELECT * FROM users WHERE username = ?', [username]);
     const user = rows;
 
