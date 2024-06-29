@@ -13,12 +13,13 @@ router.get('/:projectId/info', async (req, res) => {
 
         // 获取项目基本信息
         const [project] = await db.query('SELECT name, description, created_by, created_at FROM projects WHERE id = ?', [projectId]);
-        if (project.length) {
+        if (!project) {
             return res.status(404).json({code: 404, msg: '项目未找到'});
         }
 
         // 获取项目管理员信息
-        const [admin] = await db.query('SELECT users.id, users.name, users.email FROM users JOIN project_members ON users.id = project_members.user_id WHERE project_members.project_id = ? AND project_members.role = "admin"', [projectId]);
+        const [adminResult] = await db.query('SELECT users.id, users.name, users.email FROM users JOIN project_members ON users.id = project_members.user_id WHERE project_members.project_id = ? AND project_members.role = "admin"', [projectId]);
+        const admin = adminResult[0];
 
         // 获取所有项目成员信息
         const members = await db.query('SELECT users.id, users.name, users.email, project_members.role FROM users JOIN project_members ON users.id = project_members.user_id WHERE project_members.project_id = ?', [projectId]);
@@ -26,9 +27,9 @@ router.get('/:projectId/info', async (req, res) => {
         res.status(200).json({
             code: 200,
             data: {
-                project: project[0],
-                admin: admin[0],
-                members: members
+                project,
+                admin,
+                members
             },
             msg: '项目信息获取成功'
         });
@@ -37,7 +38,6 @@ router.get('/:projectId/info', async (req, res) => {
         res.status(500).json({code: 500, data: null, msg: '服务出错'});
     }
 });
-
 // 创建新项目并设定创建用户为管理员
 router.post('/create', async (req, res) => {
     try {
