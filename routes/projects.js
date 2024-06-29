@@ -164,7 +164,7 @@ router.get('/:projectId/accept-invite', async (req, res) => {
 
         // 验证邀请令牌
         const [invitation] = await db.query('SELECT * FROM project_invitations WHERE project_id = ? AND token = ?', [projectId, token]);
-        if (invitation.length === 0) {
+        if (invitation == undefined) {
             return res.status(400).json({code: 400, msg: '无效的邀请链接'});
         }
 
