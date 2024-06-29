@@ -49,7 +49,8 @@ router.post('/register', async (req, res) => {
 
     // 验证确认码
     const [confirmation] = await db.query('SELECT * FROM email_confirmations WHERE email = ? AND confirmation_code = ?', [email, confirmationCode]);
-    if (confirmation.length === 0) {
+    console.log(confirmation)
+    if (confirmation == undefined) {
       return res.status(400).json({code: 400, data: null, msg: '无效的确认码'});
     }
 

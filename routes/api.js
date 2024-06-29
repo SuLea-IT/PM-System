@@ -11,5 +11,5 @@ const projectsRouter = require('./projects');
 router.use('/', indexRouter);
 router.use('/users', usersRouter);
 router.use("/files", verifyAndRefreshTokens, UploadRouter);
-router.use('/projects', verifyAndRefreshTokens, projectsRouter);
+router.use('/projects', projectsRouter);
 module.exports = router;

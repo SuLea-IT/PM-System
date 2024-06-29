@@ -2,12 +2,16 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const {verifyAndRefreshTokens} = require('../utils/tokenManager');
+const crypto = require('crypto');
 const {handleFileUpload} = require('../utils/fileUpload');
 const multer = require('multer');
+const {sendEmail} = require("../utils/emailSender");
+const {verifyAndRefreshTokens} = require("../utils/tokenManager");
 const upload = multer({dest: 'uploads/'});
+
+
 // 获取项目信息
-router.get('/:projectId/info', async (req, res) => {
+router.get('/:projectId/info', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {projectId} = req.params;
 
@@ -22,7 +26,9 @@ router.get('/:projectId/info', async (req, res) => {
         const admin = adminResult[0];
 
         // 获取所有项目成员信息
-        const members = await db.query('SELECT users.id, users.name, users.email, project_members.role FROM users JOIN project_members ON users.id = project_members.user_id WHERE project_members.project_id = ?', [projectId]);
+        const members = await db.query('SELECT users.id,users.username, users.name, users.email, project_members.role' +
+            ' FROM' +
+            ' users JOIN project_members ON users.id = project_members.user_id WHERE project_members.project_id = ?', [projectId]);
 
         res.status(200).json({
             code: 200,
@@ -39,7 +45,7 @@ router.get('/:projectId/info', async (req, res) => {
     }
 });
 // 创建新项目并设定创建用户为管理员
-router.post('/create', async (req, res) => {
+router.post('/create', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {name, description} = req.body;
         const userId = req.user.id;
@@ -62,7 +68,7 @@ router.post('/create', async (req, res) => {
 });
 
 // 修改项目信息
-router.put('/:projectId', async (req, res) => {
+router.put('/:projectId', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {projectId} = req.params;
         const {name, description} = req.body;
@@ -82,7 +88,7 @@ router.put('/:projectId', async (req, res) => {
 });
 
 // 删除项目
-router.delete('/:projectId', async (req, res) => {
+router.delete('/:projectId', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {projectId} = req.params;
 
@@ -106,7 +112,7 @@ router.delete('/:projectId', async (req, res) => {
     }
 });
 // 获取项目文件信息
-router.get('/:projectId/files', async (req, res) => {
+router.get('/:projectId/files', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {projectId} = req.params;
 
@@ -124,34 +130,79 @@ router.get('/:projectId/files', async (req, res) => {
     }
 });
 
-// 添加成员到项目
-router.post('/:projectId/add-member', async (req, res) => {
+// 发送邀请链接
+router.post('/:projectId/invite', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {projectId} = req.params;
-        const {userId, role} = req.body;
+        const {email} = req.body;
 
-        const [project] = await db.query('SELECT * FROM projects WHERE id = ?', [projectId]);
-        if (!project.length) {
-            return res.status(404).json({code: 404, msg: '项目未找到'});
+        // 生成唯一令牌
+        const token = crypto.randomBytes(16).toString('hex');
+
+        // 存储邀请信息
+        await db.query('INSERT INTO project_invitations (project_id, email, token) VALUES (?, ?, ?)', [projectId, email, token]);
+
+        // 发送邀请邮件
+        const inviteLink = `${process.env.APP_URL}/api/projects/${projectId}/accept-invite?token=${token}`;
+        await sendEmail(email, '项目邀请', 'invitation', {title: '项目邀请', link: inviteLink});
+
+        res.status(201).json({
+            code: 201,
+            msg: '邀请链接已发送到成员邮箱'
+        });
+    } catch (error) {
+        console.error("Send invite link error:", error);
+        res.status(500).json({code: 500, data: null, msg: '服务出错'});
+    }
+});
+
+// 接受邀请链接
+router.get('/:projectId/accept-invite', async (req, res) => {
+    try {
+        const {projectId} = req.params;
+        const {token} = req.query;
+
+        // 验证邀请令牌
+        const [invitation] = await db.query('SELECT * FROM project_invitations WHERE project_id = ? AND token = ?', [projectId, token]);
+        if (invitation.length === 0) {
+            return res.status(400).json({code: 400, msg: '无效的邀请链接'});
         }
+
+        // 获取成员邮箱
+        const {email} = invitation;
 
         // 检查成员是否已经存在
-        const [existingMember] = await db.query('SELECT * FROM project_members WHERE project_id = ? AND user_id = ?', [projectId, userId]);
-        if (existingMember.length) {
-            return res.status(400).json({code: 400, msg: '成员已经存在'});
+        const [user] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
+        if (user == undefined) {
+            return res.status(404).json({code: 404, msg: '用户未找到'});
         }
 
-        await db.query('INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?)', [projectId, userId, role]);
+        const userId = user.id;
 
-        res.status(200).json({code: 200, msg: '成员添加成功'});
+        // 检查成员是否已经在项目中
+        const [existingMember] = await db.query('SELECT * FROM project_members WHERE project_id = ? AND user_id = ?', [projectId, userId]);
+        if (existingMember !== undefined) {
+            return res.status(400).json({code: 400, msg: '成员已经在项目中'});
+        }
+
+        // 添加成员到项目
+        await db.query('INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?)', [projectId, userId, 'member']);
+
+        // 删除邀请记录
+        await db.query('DELETE FROM project_invitations WHERE project_id = ? AND token = ?', [projectId, token]);
+
+        res.status(200).json({
+            code: 200,
+            msg: '成员已成功加入项目'
+        });
     } catch (error) {
-        console.error("Add member error:", error);
+        console.error("Accept invite link error:", error);
         res.status(500).json({code: 500, data: null, msg: '服务出错'});
     }
 });
 
 // 移除项目成员
-router.delete('/:projectId/remove-member', async (req, res) => {
+router.delete('/:projectId/remove-member', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {projectId} = req.params;
         const {userId} = req.body;
@@ -177,7 +228,7 @@ router.delete('/:projectId/remove-member', async (req, res) => {
 });
 
 // 上传文件到项目
-router.post('/:projectId/upload', upload.single('file'), async (req, res) => {
+router.post('/:projectId/upload', verifyAndRefreshTokens, upload.single('file'), async (req, res) => {
     req.body.projectId = req.params.projectId;
     req.body.userId = req.user.id;
 

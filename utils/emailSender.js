@@ -147,13 +147,13 @@ const templates = {
 </body>
 </html>
     `,
-    welcome: `
-        <div id="slideshow">
-            <h1>{{title}}</h1>
-            <p>欢迎, {{name}}</p>
-            <img src="cid:image1"/>
-        </div>
-    `
+    invitation: `
+    <div>
+      <h1>{{title}}</h1>
+      <p>您被邀请加入项目。点击以下链接接受邀请：</p>
+      <p><a href="{{link}}">{{link}}</a></p>
+    </div>
+  `
 };
 
 const sendEmail = async (to, subject, templateName, templateData) => {
