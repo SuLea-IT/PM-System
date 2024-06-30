@@ -135,6 +135,33 @@ router.post('/:projectId/invite', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {projectId} = req.params;
         const {email} = req.body;
+        const userId = req.body.userid;
+
+        // 获取用户信息
+        const [user] = await db.query('SELECT username FROM users WHERE id = ? AND email = ?', [userId, email]);
+
+        if (user == undefined) {
+            return res.status(404).json({code: 404, msg: '用户未找到或邮箱不匹配'});
+        }
+
+        const username = user.username;
+
+        // 获取项目信息
+        const [project] = await db.query('SELECT name, created_by FROM projects WHERE id = ?', [projectId]);
+        if (project == undefined) {
+            return res.status(404).json({code: 404, msg: '项目未找到'});
+        }
+
+        const projectName = project.name;
+        const projectOwnerId = project.created_by;
+
+        // 获取项目管理者的用户名
+        const [projectOwner] = await db.query('SELECT username FROM users WHERE id = ?', [projectOwnerId]);
+        if (projectOwner == undefined) {
+            return res.status(404).json({code: 404, msg: '项目管理者未找到'});
+        }
+
+        const projectOwnerUsername = projectOwner.username;
 
         // 生成唯一令牌
         const token = crypto.randomBytes(16).toString('hex');
@@ -144,7 +171,19 @@ router.post('/:projectId/invite', verifyAndRefreshTokens, async (req, res) => {
 
         // 发送邀请邮件
         const inviteLink = `${process.env.APP_URL}/api/projects/${projectId}/accept-invite?token=${token}`;
-        await sendEmail(email, '项目邀请', 'invitation', {title: '项目邀请', link: inviteLink});
+        const topLink = `${process.env.APP_URL}/api/projects/${projectId}/accept-invite?`
+        const tokenLink = `token=${token}`
+        setImmediate(() => {
+            sendEmail(email, '项目邀请', 'invitation', {
+                title: '项目邀请',
+                inviteLink: inviteLink,
+                tokenLink: tokenLink,
+                topLink: topLink,
+                username: username,
+                projectName: projectName,
+                projectOwnerUsername: projectOwnerUsername
+            }).catch(error => console.error("Error sending email:", error));
+        });
 
         res.status(201).json({
             code: 201,

@@ -8,23 +8,23 @@ const {sendEmail} = require('../utils/emailSender');
 // POST: 发送邮箱验证码
 router.post('/send-confirmation-code', async (req, res) => {
   try {
-    const {email} = req.body;
+    const {username, email} = req.body;
 
-    // 验证请求体是否包含所有必要字段
     if (!email) {
       return res.status(400).json({code: 400, data: null, msg: '缺少必要的字段'});
     }
 
-    // 生成确认码
     const confirmationCode = crypto.randomBytes(2).toString('hex');
     await db.query('INSERT INTO email_confirmations (email, confirmation_code) VALUES (?, ?)', [email, confirmationCode]);
-
     // 发送确认邮件
-    await sendEmail(email, '确认你的邮箱', 'confirmation', {title: '邮箱确认', code: confirmationCode});
+    setImmediate(() => {
+      sendEmail(email, '确认你的邮箱', 'confirmation', {title: '邮箱确认', code: confirmationCode, username: username})
+          .catch(error => console.error("Error sending email:", error));
+    });
 
     res.status(201).json({
       code: 201,
-      msg: '确认码已发送到您的邮箱，请检查您的邮箱并输入确认码以完成注册'
+      msg: '确认码已发送到您的邮箱'
     });
   } catch (error) {
     console.error("Generate confirmation code error:", error);
@@ -49,7 +49,6 @@ router.post('/register', async (req, res) => {
 
     // 验证确认码
     const [confirmation] = await db.query('SELECT * FROM email_confirmations WHERE email = ? AND confirmation_code = ?', [email, confirmationCode]);
-    console.log(confirmation)
     if (confirmation == undefined) {
       return res.status(400).json({code: 400, data: null, msg: '无效的确认码'});
     }
