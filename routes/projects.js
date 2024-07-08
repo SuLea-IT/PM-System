@@ -273,12 +273,33 @@ router.delete('/:projectId/remove-member', verifyAndRefreshTokens, async (req, r
 });
 
 // 上传文件到项目
-router.post('/:projectId/upload', verifyAndRefreshTokens, multerUpload.single('file'), async (req, res) => {
+router.post('/:projectId/upload', verifyAndRefreshTokens, multerUpload.array('file', 10), async (req, res) => {
     req.body.projectId = req.params.projectId;
     req.body.userId = req.user.id;
 
-    await handleFileUpload(req, res);
+    console.log('Request Body:', req.body);  // Log the request body
+
+    try {
+        const uploadResults = await Promise.all(req.files.map(file => {
+            req.file = file;
+            return handleFileUpload(req);
+        }));
+
+        res.status(200).json({
+            code: 200,
+            msg: '所有文件上传成功',
+            data: uploadResults
+        });
+    } catch (error) {
+        console.error('File upload error:', error);
+        res.status(500).json({
+            code: 500,
+            msg: '文件上传失败',
+            data: error.message
+        });
+    }
 });
+
 
 module.exports = router;
 

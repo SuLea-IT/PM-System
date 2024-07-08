@@ -3,12 +3,14 @@ const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
+const cors = require('cors');
 require('dotenv').config(); // 确保加载环境变量
 const apiRouter = require('./routes/api');
 const createError = require("http-errors");
 // 创建 Express 应用
 const app = express();
 
+app.use(cors());
 // 设置视图目录和视图引擎
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
