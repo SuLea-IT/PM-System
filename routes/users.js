@@ -76,7 +76,7 @@ router.post('/register', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     let avatarUrl = process.env.APP_URL
-    avatarUrl = path.join(avatarUrl, 'uploads', 'avatar', 'default.png');
+    avatarUrl = path.join(avatarUrl, 'uploads', 'avatar', 'default.jpg');
     // 设置默认头像
     const defaultAvatar = avatar || avatarUrl;
     await db.query('INSERT INTO users (username, password, name, email, email_confirmed,avatar) VALUES (?, ?, ?, ?,' +
