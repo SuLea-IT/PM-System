@@ -5,6 +5,12 @@ const db = require('../config/db');
 const crypto = require('crypto');
 const {generateTokens, verifyAndRefreshTokens} = require('../utils/tokenManager');
 const {sendEmail} = require('../utils/emailSender');
+
+const {upload, uploadAvatar} = require('../utils/avatarUpload');
+
+// 上传用户头像
+router.post('/upload-avatar/:id', verifyAndRefreshTokens, upload.single('avatar'), uploadAvatar('user'));
+
 // POST: 发送邮箱验证码
 router.post('/send-confirmation-code', async (req, res) => {
   try {
