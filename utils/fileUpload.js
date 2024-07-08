@@ -15,7 +15,7 @@ const uploadProgress = {};
 
 // 处理文件上传和合并
 async function handleFileUpload(req, res) {
-    const {index, totalChunks, fileExtension} = req.body;
+    const {totalChunks, fileExtension} = req.body;
     const total = parseInt(totalChunks, 10); // 确保转换为整数
     if (isNaN(total) || total < 1) {
         return res.status(400).json({
@@ -34,7 +34,6 @@ async function handleFileUpload(req, res) {
     await fsExtra.ensureDir(projectDir);
 
     const chunkDir = path.join(projectDir, uploadId);
-    const chunkPath = path.join(chunkDir, index.toString());
     await fsExtra.ensureDir(chunkDir);
 
     if (!uploadProgress[uploadId]) {
@@ -42,38 +41,39 @@ async function handleFileUpload(req, res) {
         uploadProgress[uploadId].md5Incremental = createMD5Incremental(); // 初始化 MD5 增量对象
     }
 
-    // 检查分片是否已经上传
-    if (await checkChunkExists(chunkDir, index)) {
-        return res.status(200).json({
-            code: 200,
-            msg: '分片已经上传',
-            data: null
-        });
-    }
-
     try {
-        if (!req.file) {
+        const files = req.files;
+        if (!files || files.length === 0) {
             throw new Error('文件未提供');
         }
 
-        const fileSize = req.file.size;
-        uploadProgress[uploadId].fileSize += fileSize; // 增加文件大小
+        for (const file of files) {
+            const {index} = file.originalname.match(/(\d+)\.part$/).groups;
+            const chunkPath = path.join(chunkDir, index.toString());
 
-        await fsExtra.move(req.file.path, chunkPath);
-        const indexInt = parseInt(index, 10);
-        if (isNaN(indexInt) || indexInt < 0 || indexInt >= uploadProgress[uploadId].chunks.length) {
-            return res.status(400).json({
-                code: 400,
-                msg: '无效的索引值',
-                data: null
-            });
+            if (await checkChunkExists(chunkDir, index)) {
+                continue;
+            }
+
+            const fileSize = file.size;
+            uploadProgress[uploadId].fileSize += fileSize; // 增加文件大小
+
+            await fsExtra.move(file.path, chunkPath);
+            const indexInt = parseInt(index, 10);
+            if (isNaN(indexInt) || indexInt < 0 || indexInt >= uploadProgress[uploadId].chunks.length) {
+                return res.status(400).json({
+                    code: 400,
+                    msg: '无效的索引值',
+                    data: null
+                });
+            }
+
+            // 读取分片数据并更新 MD5
+            const chunkData = await fsExtra.readFile(chunkPath);
+            updateMD5Incremental(uploadProgress[uploadId].md5Incremental, chunkData);
+
+            uploadProgress[uploadId].chunks[indexInt] = true;  // 标记为已上传
         }
-
-        // 读取分片数据并更新 MD5
-        const chunkData = await fsExtra.readFile(chunkPath);
-        updateMD5Incremental(uploadProgress[uploadId].md5Incremental, chunkData);
-
-        uploadProgress[uploadId].chunks[indexInt] = true;  // 标记为已上传
 
         // 检查是否所有分片都已上传
         const allUploaded = uploadProgress[uploadId].chunks.every(status => status === true);
