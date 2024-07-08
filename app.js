@@ -19,6 +19,7 @@ app.use(express.json()); // 解析 JSON 请求体
 app.use(express.urlencoded({extended: false})); // 解析 URL-encoded 请求体
 app.use(cookieParser()); // 解析 cookie
 app.use(express.static(path.join(__dirname, 'public'))); // 静态文件服务
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // 为 /uploads 路径提供静态文件服务
 
 // 设置路由
 app.use('/api', apiRouter);
