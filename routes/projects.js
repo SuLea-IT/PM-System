@@ -8,6 +8,10 @@ const multer = require('multer');
 const {sendEmail} = require("../utils/emailSender");
 const {verifyAndRefreshTokens} = require("../utils/tokenManager");
 const upload = multer({dest: 'uploads/'});
+const {upload, uploadAvatar} = require('../utils/avatarUpload');
+
+// 上传项目头像
+router.post('/upload-avatar/:id', verifyAndRefreshTokens, upload.single('avatar'), uploadAvatar('project'));
 
 
 // 获取项目信息
@@ -16,7 +20,9 @@ router.get('/:projectId/info', verifyAndRefreshTokens, async (req, res) => {
         const {projectId} = req.params;
 
         // 获取项目基本信息
-        const [project] = await db.query('SELECT name, description, created_by, created_at FROM projects WHERE id = ?', [projectId]);
+        const [project] = await db.query('SELECT avatar,name, description, created_by, created_at FROM projects WHERE' +
+            ' id' +
+            ' = ?', [projectId]);
         if (!project) {
             return res.status(404).json({code: 404, msg: '项目未找到'});
         }
