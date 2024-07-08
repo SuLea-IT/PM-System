@@ -7,6 +7,7 @@ const {generateTokens, verifyAndRefreshTokens} = require('../utils/tokenManager'
 const {sendEmail} = require('../utils/emailSender');
 
 const {upload, uploadAvatar} = require('../utils/avatarUpload');
+const path = require("path");
 
 // 上传用户头像
 router.post('/upload-avatar/:id', verifyAndRefreshTokens, upload.single('avatar'), uploadAvatar('user'));
@@ -41,7 +42,7 @@ router.post('/send-confirmation-code', async (req, res) => {
 // POST: 用户注册
 router.post('/register', async (req, res) => {
   try {
-    const {username, password, name, email, confirmationCode} = req.body;
+    const {username, password, name, email, confirmationCode, avatar} = req.body;
 
     // 验证请求体是否包含所有必要字段
     if (!username || !password || !name || !email || !confirmationCode) {
@@ -49,6 +50,7 @@ router.post('/register', async (req, res) => {
     }
 
     const [existingUsers] = await db.query('SELECT id FROM users WHERE username = ?', [username]);
+    console.log(existingUsers)
     if (existingUsers !== undefined) {
       return res.status(409).json({code: 409, data: null, msg: '用户名已存在'});
     }
@@ -73,7 +75,12 @@ router.post('/register', async (req, res) => {
     await db.query('DELETE FROM email_confirmations WHERE email = ?', [email]);
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await db.query('INSERT INTO users (username, password, name, email, email_confirmed) VALUES (?, ?, ?, ?, ?)', [username, hashedPassword, name, email, 1]);
+    let avatarUrl = process.env.APP_URL
+    avatarUrl = path.join(avatarUrl, 'uploads', 'avatar', 'default.png');
+    // 设置默认头像
+    const defaultAvatar = avatar || avatarUrl;
+    await db.query('INSERT INTO users (username, password, name, email, email_confirmed,avatar) VALUES (?, ?, ?, ?,' +
+        ' ?,?)', [username, hashedPassword, name, email, 1, defaultAvatar]);
 
     res.status(201).json({
       code: 201,

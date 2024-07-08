@@ -7,7 +7,7 @@ const {handleFileUpload} = require('../utils/fileUpload');
 const multer = require('multer');
 const {sendEmail} = require("../utils/emailSender");
 const {verifyAndRefreshTokens} = require("../utils/tokenManager");
-const upload = multer({dest: 'uploads/'});
+const multerUpload = multer({dest: 'uploads/'});
 const {upload, uploadAvatar} = require('../utils/avatarUpload');
 
 // 上传项目头像
@@ -273,7 +273,7 @@ router.delete('/:projectId/remove-member', verifyAndRefreshTokens, async (req, r
 });
 
 // 上传文件到项目
-router.post('/:projectId/upload', verifyAndRefreshTokens, upload.single('file'), async (req, res) => {
+router.post('/:projectId/upload', verifyAndRefreshTokens, multerUpload.single('file'), async (req, res) => {
     req.body.projectId = req.params.projectId;
     req.body.userId = req.user.id;
 

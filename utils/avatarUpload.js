@@ -2,7 +2,6 @@ const multer = require('multer');
 const path = require('path');
 const fsExtra = require('fs-extra');
 const db = require('../config/db');
-const logger = require('../config/logger');
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -33,9 +32,6 @@ const uploadAvatar = (type) => {
             await db.query(`UPDATE ${table}
                             SET ${column} = ?
                             WHERE ${idColumn} = ?`, [filePath, id]);
-
-            logger.info(`${type === 'user' ? 'User' : 'Project'} avatar uploaded for ${type} ${id} by user ${req.user.id}`);
-
             res.status(200).json({
                 code: 200,
                 msg: `${type === 'user' ? '用户' : '项目'}头像上传成功`,
