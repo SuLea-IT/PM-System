@@ -277,17 +277,27 @@ router.post('/:projectId/upload', verifyAndRefreshTokens, multerUpload.array('fi
     req.body.projectId = req.params.projectId;
     req.body.userId = req.user.id;
 
-    console.log('Request Body:', req.body);  // Log the request body
-
     try {
-        const uploadResults = await Promise.all(req.files.map(file => {
-            req.file = file;
-            return handleFileUpload(req);
-        }));
+        const uploadResults = [];
+        let Fdata = "所有文件上传成功";
+        let FCode = 200;
 
-        res.status(200).json({
-            code: 200,
-            msg: '所有文件上传成功',
+        for (const file of req.files) {
+            req.file = file;
+            const result = await handleFileUpload(req);
+
+            if (result.msg === "分片上传成功，等待其他分片") {
+                uploadResults.push(result.data);
+            } else if (result.msg === '文件已经存在') {
+                Fdata = "文件已经存在";
+                FCode = 400;
+                break;  // 终止后续文件上传
+            }
+        }
+
+        res.status(FCode).json({
+            code: FCode,
+            msg: Fdata,
             data: uploadResults
         });
     } catch (error) {

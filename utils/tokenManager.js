@@ -21,7 +21,6 @@ const refreshToken = (token) => {
 const verifyAndRefreshTokens = (req, res, next) => {
     const accessToken = req.headers['authorization']?.split(' ')[1];
     const refreshToken = req.headers['x-refresh-token'];
-    console.log(accessToken)
 
     if (!accessToken) {
         return res.status(401).json({msg: '需要访问令牌'});
