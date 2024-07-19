@@ -369,9 +369,9 @@ const templates = {
                 <div class="codeT">
                     <span>用户</span>
                     <span style="word-wrap: break-word; color: #e83e8c; font-size: 87.5%;"> {{username}} </span>
-                    <span>你好，邀请你的项目管理者为</span>
+                    <span>你好，用户</span>
                     <span style="word-wrap: break-word; color: #e83e8c; font-size: 87.5%;">{{projectOwnerUsername}}</span>
-                    <span>项目名称为</span>
+                    <span>邀请你加入项目：</span>
                     <span style="word-wrap: break-word; color: #e83e8c; font-size: 87.5%;">{{projectName}}</span>
                     <span>链接为：</span>
                 </div>
@@ -416,10 +416,6 @@ const sendEmail = async (to, subject, templateName, templateData) => {
             filename: 'output.gif',
             path: 'public/images/output.gif',
             cid: 'image1' // 这里的cid需要与img标签中的cid匹配
-        }, {
-            filename: 'out.gif',
-            path: 'public/images/out.gif',
-            cid: 'image2' // 这里的cid需要与img标签中的cid匹配
         }];
 
         let info = await transporter.sendMail({
