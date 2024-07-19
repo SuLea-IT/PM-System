@@ -9,7 +9,7 @@ const {sendEmail} = require("../utils/emailSender");
 const {verifyAndRefreshTokens} = require("../utils/tokenManager");
 const multerUpload = multer({dest: 'uploads/'});
 const {upload, uploadAvatar} = require('../utils/avatarUpload');
-
+const {createProjectApplication, findProjectApplications, updateApplicationStatus} = require('../utils/projectHelpers');
 // 上传项目头像
 router.post('/upload-avatar/:id', verifyAndRefreshTokens, upload.single('avatar'), uploadAvatar('project'));
 
@@ -132,6 +132,57 @@ router.get('/:projectId/files', verifyAndRefreshTokens, async (req, res) => {
         });
     } catch (error) {
         console.error("Get project files error:", error);
+        res.status(500).json({code: 500, data: null, msg: '服务出错'});
+    }
+});
+
+// 用户申请加入项目
+router.post('/:projectId/apply', verifyAndRefreshTokens, async (req, res) => {
+    try {
+        const {projectId} = req.params;
+        const userId = req.user.id;
+
+        // 创建新的申请记录
+        const applicationId = await createProjectApplication(projectId, userId);
+
+        res.status(201).json({code: 201, data: {applicationId}, msg: '申请已提交'});
+    } catch (error) {
+        console.error("Project application error:", error);
+        res.status(500).json({code: 500, data: null, msg: '服务出错'});
+    }
+});
+
+// 获取项目的所有申请
+router.get('/:projectId/applications', verifyAndRefreshTokens, async (req, res) => {
+    try {
+        const {projectId} = req.params;
+
+        // 获取所有申请
+        const applications = await findProjectApplications(projectId);
+
+        res.status(200).json({code: 200, data: applications, msg: '获取申请成功'});
+    } catch (error) {
+        console.error("Get project applications error:", error);
+        res.status(500).json({code: 500, data: null, msg: '服务出错'});
+    }
+});
+
+// 审核项目申请
+router.put('/applications/:applicationId', verifyAndRefreshTokens, async (req, res) => {
+    try {
+        const {applicationId} = req.params;
+        const {status} = req.body; // 'approved' or 'rejected'
+
+        // 更新申请状态
+        const success = await updateApplicationStatus(applicationId, status);
+
+        if (success) {
+            res.status(200).json({code: 200, msg: '申请状态更新成功'});
+        } else {
+            res.status(404).json({code: 404, msg: '申请未找到'});
+        }
+    } catch (error) {
+        console.error("Update application status error:", error);
         res.status(500).json({code: 500, data: null, msg: '服务出错'});
     }
 });
