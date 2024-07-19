@@ -28,7 +28,7 @@ const templates = {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Slideshow</title>
     <style>
-        #slideshow {
+                #slideshow {
             max-width: 500px;
             margin: auto;
             background: #121a26;
@@ -37,11 +37,12 @@ const templates = {
             align-items: center;
             flex-wrap: wrap;
             padding: 10px;
-            background-image: url(data:image/png;base64,${image3Base64});
+            background-image: url(2017_bg.png);
             background-size: cover;
         }
 
         .tl {
+            width: 40%;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -49,6 +50,10 @@ const templates = {
 
         .gif-x {
             width: 60px;
+        }
+
+        .gif {
+            width: 30%;
         }
 
         .gif-r {
@@ -62,6 +67,7 @@ const templates = {
             border-radius: 4px;
             padding: 0 10px;
             font-size: 24px;
+
         }
 
         .title {
@@ -72,6 +78,7 @@ const templates = {
         .line {
             width: 100%;
             height: 2px;
+            /* background: #384860; */
             border-radius: 1px;
         }
 
@@ -91,6 +98,7 @@ const templates = {
             align-items: center;
             justify-content: space-evenly;
             flex-direction: column;
+
         }
 
         .codeT {
@@ -102,6 +110,7 @@ const templates = {
             display: flex;
             align-items: center;
             justify-content: space-evenly;
+
         }
 
         .code div {
@@ -119,6 +128,26 @@ const templates = {
         .tip {
             font-size: 12px;
             color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .date {
+            display: flex;
+            flex-direction: column;
+            width: 30%;
+            color: aliceblue;
+            font-style: italic;
+        }
+
+        .date div {
+            display: flex;
+            justify-content: center;
+        }
+
+        .date div:nth-child(2) {
+            font-size: 24px;
         }
     </style>
 </head>
@@ -133,9 +162,10 @@ const templates = {
                 <span class="stand">i8</span>
                 <span>！</span>
             </div>
-            <div class="gif" style="position: relative; right: -100px;">
-                <img class="gif-x" src="cid:image2" />
-            </div>
+        </div>
+        <div class="date">
+            <div>7/19</div>
+            <div>10:48</div>
         </div>
         <div class="line"></div>
         <div class="center">
@@ -149,7 +179,12 @@ const templates = {
                     {{codeBlocks}}
                 </div>
                 <div class="tip">
-                    如果影响到你，请前往系统取消系统邮箱提醒
+                    <div style="padding: 10px 0;">
+                        如果影响到你，请前往系统取消系统邮箱提醒
+                    </div>
+                    <div style="color: red;">
+                        30分钟内有效
+                    </div>
                 </div>
             </div>
         </div>
@@ -180,6 +215,7 @@ const templates = {
         }
 
         .tl {
+            width: 40%;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -187,6 +223,10 @@ const templates = {
 
         .gif-x {
             width: 60px;
+        }
+
+        .gif {
+            width: 30%;
         }
 
         .gif-r {
@@ -280,10 +320,29 @@ const templates = {
         .link a:hover {
             cursor: pointer;
         }
-
         .tip {
             font-size: 12px;
             color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .date {
+            display: flex;
+            flex-direction: column;
+            width: 30%;
+            color: aliceblue;
+            font-style: italic;
+        }
+
+        .date div {
+            display: flex;
+            justify-content: center;
+        }
+
+        .date div:nth-child(2) {
+            font-size: 24px;
         }
     </style>
 </head>
@@ -299,9 +358,10 @@ const templates = {
                 <span class="stand">i8</span>
                 <span>！</span>
             </div>
-            <div class="gif" style="position: relative; right: -100px;">
-                <img class="gif-x" src="cid:image2" />
-            </div>
+        </div>
+        <div class="date">
+            <div>7/19</div>
+            <div>10:48</div>
         </div>
         <div class="line"></div>
         <div class="center">
@@ -320,7 +380,12 @@ const templates = {
                                     <a href="{{inviteLink}}">{{tokenLink}}</a>
                 </div>
                 <div class="tip">
-                    如果影响到你，请前往系统取消系统邮箱提醒
+                    <div style="padding: 10px 0;">
+                        如果影响到你，请前往系统取消系统邮箱提醒
+                    </div>
+                    <div style="color: red;">
+                        30分钟内有效
+                    </div>
                 </div>
             </div>
         </div>
