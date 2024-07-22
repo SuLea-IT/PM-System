@@ -9,7 +9,14 @@ const {sendEmail} = require("../utils/emailSender");
 const {verifyAndRefreshTokens} = require("../utils/tokenManager");
 const multerUpload = multer({dest: 'uploads/'});
 const {upload, uploadAvatar} = require('../utils/avatarUpload');
-const {createProjectApplication, findProjectApplications, updateApplicationStatus} = require('../utils/projectHelpers');
+const {
+    createProjectApplication,
+    findProjectApplications,
+    updateApplicationStatus,
+    isUserProjectMember,
+    hasPendingApplication,
+    isProjectCreator
+} = require('../utils/projectHelpers');
 // 上传项目头像
 router.post('/upload-avatar/:id', verifyAndRefreshTokens, upload.single('avatar'), uploadAvatar('project'));
 
@@ -141,6 +148,23 @@ router.post('/:projectId/apply', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {projectId} = req.params;
         const userId = req.user.id;
+
+        // 检查用户是否已经是项目成员
+        const isMember = await isUserProjectMember(projectId, userId);
+        if (isMember) {
+            return res.status(400).json({code: 400, msg: '您已经是该项目的成员'});
+        }
+        // 检查用户是否是项目创建者
+        const isCreator = await isProjectCreator(projectId, userId);
+        if (isCreator) {
+            return res.status(400).json({code: 400, msg: '您是该项目的创建者，不能申请加入'});
+        }
+
+        // 检查是否已有待处理的申请
+        const hasPending = await hasPendingApplication(projectId, userId);
+        if (hasPending) {
+            return res.status(400).json({code: 400, msg: '您已提交过申请，正在等待审核'});
+        }
 
         // 创建新的申请记录
         const applicationId = await createProjectApplication(projectId, userId);
