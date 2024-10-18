@@ -17,6 +17,7 @@ const {
     hasPendingApplication,
     isProjectCreator
 } = require('../utils/projectHelpers');
+const path = require("path");
 // 上传项目头像
 router.post('/upload-avatar/:id', verifyAndRefreshTokens, upload.single('avatar'), uploadAvatar('project'));
 
@@ -62,9 +63,12 @@ router.post('/create', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {name, description} = req.body;
         const userId = req.user.id;
-
+        let avatarUrl = process.env.APP_URL
+        avatarUrl = path.join(avatarUrl, 'uploads', 'avatar', 'default.jpg');
+        const defaultAvatar = avatarUrl;
         // 插入项目数据
-        const result = await db.query('INSERT INTO projects (name, description, created_by) VALUES (?, ?, ?)', [name, description, userId]);
+        const result = await db.query('INSERT INTO projects (name, description, created_by,avatar) VALUES (?, ?,' +
+            ' ?,?)', [name, description, userId, defaultAvatar]);
 
         if (!result || !result.insertId) {
             throw new Error('项目创建失败');
@@ -325,11 +329,11 @@ router.get('/:projectId/accept-invite', async (req, res) => {
 router.delete('/:projectId/remove-member', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {projectId} = req.params;
-        const {userId} = req.body;
+        const userId = req.body.userid;
 
         // 检查成员是否存在
         const [existingMember] = await db.query('SELECT * FROM project_members WHERE project_id = ? AND user_id = ?', [projectId, userId]);
-        if (!existingMember.length) {
+        if (!existingMember) {
             return res.status(404).json({code: 404, msg: '成员未找到'});
         }
 

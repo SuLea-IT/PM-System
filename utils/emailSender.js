@@ -164,8 +164,9 @@ const templates = {
             </div>
         </div>
         <div class="date">
-            <div>7/19</div>
-            <div>10:48</div>
+<div>{{currentDate}}</div>
+<div>{{currentTime}}</div>
+
         </div>
         <div class="line"></div>
         <div class="center">
@@ -360,8 +361,9 @@ const templates = {
             </div>
         </div>
         <div class="date">
-            <div>7/19</div>
-            <div>10:48</div>
+<div>{{currentDate}}</div>
+<div>{{currentTime}}</div>
+
         </div>
         <div class="line"></div>
         <div class="center">
@@ -408,6 +410,21 @@ const sendEmail = async (to, subject, templateName, templateData) => {
             htmlToSend = htmlToSend.replace('{{codeBlocks}}', codeBlocks);
         }
 
+        // 获取当前时间
+        const now = new Date();
+        const month = now.getMonth() + 1; // 月份从0开始，所以加1
+        const day = now.getDate();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+
+        // 格式化时间
+        const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        const formattedDate = `${month}/${day}`;
+
+        // 替换模板中的占位符
+        htmlToSend = htmlToSend.replace('{{currentDate}}', formattedDate);
+        htmlToSend = htmlToSend.replace('{{currentTime}}', formattedTime);
+
         for (const key in templateData) {
             htmlToSend = htmlToSend.replace(new RegExp(`{{${key}}}`, 'g'), templateData[key]);
         }
@@ -431,6 +448,7 @@ const sendEmail = async (to, subject, templateName, templateData) => {
         console.error('Error sending email:', error);
     }
 };
+
 
 module.exports = {
     sendEmail
