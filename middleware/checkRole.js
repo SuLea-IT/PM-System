@@ -10,4 +10,4 @@ function checkAdmin(req, res, next) {
     next();
 }
 
-module.exports = checkAdmin;
+module.exports = {checkAdmin};

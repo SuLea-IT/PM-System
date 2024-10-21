@@ -93,6 +93,7 @@ router.post('/register', async (req, res) => {
   }
 });
 // POST: 用户登录
+// POST: 用户登录
 router.post('/login', async (req, res) => {
   try {
     const {username, password} = req.body;
@@ -102,26 +103,37 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({code: 400, data: null, msg: '缺少必要的字段'});
     }
 
-
+    // 查询用户信息
     const [rows] = await db.query('SELECT * FROM users WHERE username = ?', [username]);
-    const user = rows;
+    const user = rows; // 这里应该获取 rows 的第一个元素
 
     if (!user) {
       return res.status(404).json({code: 404, data: null, msg: '用户未找到'});
     }
+
+    // 检查邮箱是否确认
     if (user.email_confirmed !== 1) {
       return res.status(403).json({code: 403, data: null, msg: '邮箱未确认'});
     }
 
+    // 检查用户的 status 是否为 1，若不为 1 则阻止登录
+    if (user.status !== 1) {
+      return res.status(403).json({code: 403, data: null, msg: '因操作原因已被封禁，请联系管理员'});
+    }
+
+    // 验证密码
     if (await bcrypt.compare(password, user.password)) {
-      console.log(user)
       const {accessToken, refreshToken} = generateTokens({id: user.id, role: user.role});
+
+      // 设置 Refresh Token 的过期时间
       const offset = 8; // 东八区是UTC+8
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       const expiresAtGMT8 = new Date(expiresAt.getTime() + offset * 3600 * 1000);
 
+      // 保存 Refresh Token
       await db.query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)', [user.id, refreshToken, expiresAt]);
 
+      // 返回登录成功信息
       res.json({
         code: 200,
         data: {
@@ -133,6 +145,7 @@ router.post('/login', async (req, res) => {
         msg: '登录成功'
       });
     } else {
+      // 密码不匹配
       res.status(401).json({code: 401, data: null, msg: '用户名或密码错误'});
     }
   } catch (error) {
@@ -140,6 +153,7 @@ router.post('/login', async (req, res) => {
     res.status(500).json({code: 500, data: null, msg: '服务器出错'});
   }
 });
+
 
 // GET: 获取用户个人资料
 router.get('/profile', verifyAndRefreshTokens, async (req, res) => {

@@ -10,7 +10,7 @@ const generateTokens = (payload) => {
 const refreshToken = (token) => {
     try {
         const decoded = jwt.verify(token, jwtConfig.refreshTokenSecret);
-        const payload = {id: decoded.id, role: decoded.role}; // 包含角色信息
+        const payload = {id: decoded.id, role: decoded.role, status: decoded.status}; // 包含角色信息
         return generateTokens(payload);
     } catch (error) {
         return null;
@@ -33,11 +33,11 @@ const verifyAndRefreshTokens = (req, res, next) => {
                         return res.status(403).json({msg: '刷新令牌无效'});
                     }
                     // 生成新的令牌并更新响应头
-                    const newTokens = generateTokens({id: decoded.id, role: decoded.role}); // 包含角色
+                    const newTokens = generateTokens({id: decoded.id, role: decoded.role, status: decoded.status}); // 包含角色
                     res.setHeader('Authorization', `Bearer ${newTokens.accessToken}`);
                     res.setHeader('x-refresh-token', newTokens.refreshToken);
 
-                    req.user = {id: decoded.id, role: decoded.role};
+                    req.user = {id: decoded.id, role: decoded.role, status: decoded.status};
                     next();
                 });
             } else {
