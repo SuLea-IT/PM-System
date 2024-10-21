@@ -114,7 +114,8 @@ router.post('/login', async (req, res) => {
     }
 
     if (await bcrypt.compare(password, user.password)) {
-      const {accessToken, refreshToken} = generateTokens({id: user.id});
+      console.log(user)
+      const {accessToken, refreshToken} = generateTokens({id: user.id, role: user.role});
       const offset = 8; // 东八区是UTC+8
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       const expiresAtGMT8 = new Date(expiresAt.getTime() + offset * 3600 * 1000);

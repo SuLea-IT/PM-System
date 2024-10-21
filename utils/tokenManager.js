@@ -1,4 +1,3 @@
-//utils/tokenManager.js
 const jwt = require('jsonwebtoken');
 const {jwtConfig} = require('../config/config');
 
@@ -11,7 +10,7 @@ const generateTokens = (payload) => {
 const refreshToken = (token) => {
     try {
         const decoded = jwt.verify(token, jwtConfig.refreshTokenSecret);
-        const payload = {id: decoded.id};
+        const payload = {id: decoded.id, role: decoded.role}; // 包含角色信息
         return generateTokens(payload);
     } catch (error) {
         return null;
@@ -34,18 +33,18 @@ const verifyAndRefreshTokens = (req, res, next) => {
                         return res.status(403).json({msg: '刷新令牌无效'});
                     }
                     // 生成新的令牌并更新响应头
-                    const newTokens = generateTokens({id: decoded.id});
+                    const newTokens = generateTokens({id: decoded.id, role: decoded.role}); // 包含角色
                     res.setHeader('Authorization', `Bearer ${newTokens.accessToken}`);
                     res.setHeader('x-refresh-token', newTokens.refreshToken);
 
-                    req.user = {id: decoded.id};
+                    req.user = {id: decoded.id, role: decoded.role};
                     next();
                 });
             } else {
                 return res.status(403).json({msg: '访问令牌无效'});
             }
         } else {
-            req.user = decoded;
+            req.user = decoded; // 包含用户的角色信息
             next();
         }
     });
