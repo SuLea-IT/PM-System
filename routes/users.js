@@ -93,7 +93,6 @@ router.post('/register', async (req, res) => {
   }
 });
 // POST: 用户登录
-// POST: 用户登录
 router.post('/login', async (req, res) => {
   try {
     const {username, password} = req.body;
@@ -154,6 +153,122 @@ router.post('/login', async (req, res) => {
   }
 });
 
+
+// POST: 请求邮箱验证码
+router.post('/request-login-code', async (req, res) => {
+  try {
+    const {username} = req.body;
+
+    if (!username) {
+      return res.status(400).json({code: 400, data: null, msg: '用户名是必需的。'});
+    }
+
+    // 从数据库中查找用户的 email
+    const [rows] = await db.query('SELECT email, username FROM users WHERE username = ?', [username]);
+    const user = rows; // 假设rows是一个数组
+
+    if (!user) {
+      return res.status(404).json({code: 404, data: null, msg: '用户未找到。'});
+    }
+
+    const email = user.email;
+
+    // 生成验证码并保存到数据库
+    const loginCode = crypto.randomBytes(2).toString('hex');
+    await db.query('INSERT INTO email_confirmations (email, confirmation_code) VALUES (?, ?)', [email, loginCode]);
+
+    // 准备模板数据
+    const templateData = {
+      title: '登录验证码',
+      code: loginCode,
+      username: user.username // 从数据库中获取的用户名
+    };
+
+    // 发送验证码到用户的邮箱
+    setImmediate(() => {
+      sendEmail(email, '您的登录验证码', 'confirmation', templateData)
+          .catch(error => console.error("发送验证码邮件时出错:", error));
+    });
+
+    res.status(201).json({
+      code: 201,
+      msg: '验证码已发送到您的邮箱'
+    });
+  } catch (error) {
+    console.error("请求验证码出错:", error);
+    res.status(500).json({code: 500, data: null, msg: '服务出错'});
+  }
+});
+
+
+// POST: 验证码登录
+router.post('/login-with-code', async (req, res) => {
+  try {
+    const {username, confirmationCode} = req.body;
+
+    if (!username || !confirmationCode) {
+      return res.status(400).json({code: 400, data: null, msg: '缺少用户名或验证码。'});
+    }
+
+    // 查找用户
+    const [rows] = await db.query('SELECT * FROM users WHERE username = ?', [username]);
+    const user = rows;
+
+    if (!user) {
+      return res.status(404).json({code: 404, data: null, msg: '用户未找到。'});
+    }
+
+    // 验证验证码
+    const [confirmation] = await db.query('SELECT * FROM email_confirmations WHERE email = ? AND confirmation_code = ?', [user.email, confirmationCode]);
+
+    if (!confirmation) {
+      return res.status(400).json({code: 400, data: null, msg: '无效的验证码。'});
+    }
+
+    // 检查验证码是否过期（30分钟过期）
+    const confirmationTime = new Date(confirmation.created_at);
+    const currentTime = new Date();
+    const timeDiff = (currentTime - confirmationTime) / 1000 / 60; // 分钟为单位
+    if (timeDiff > 30) {
+      await db.query('DELETE FROM email_confirmations WHERE email = ?', [user.email]);
+      return res.status(400).json({code: 400, data: null, msg: '验证码已过期。'});
+    }
+
+    // 删除已验证的验证码
+    await db.query('DELETE FROM email_confirmations WHERE email = ?', [user.email]);
+
+    // 检查用户是否被封禁
+    if (user.status !== 1) {
+      return res.status(403).json({code: 403, data: null, msg: '用户已被封禁，请联系管理员。'});
+    }
+
+    // 生成访问令牌和刷新令牌
+    const {accessToken, refreshToken} = generateTokens({id: user.id, role: user.role});
+
+    // 设置 Refresh Token 的过期时间
+    const offset = 8; // 东八区是UTC+8
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7天
+    const expiresAtGMT8 = new Date(expiresAt.getTime() + offset * 3600 * 1000);
+
+    // 保存 Refresh Token
+    await db.query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)', [user.id, refreshToken, expiresAt]);
+
+    // 登录成功，返回令牌
+    res.json({
+      code: 200,
+      data: {
+        accessToken,
+        refreshToken,
+        refreshTokenExpiresAt: expiresAtGMT8,
+        user: {id: user.id, username: user.username, name: user.name, email: user.email, role: user.role}
+      },
+      msg: '登录成功'
+    });
+  } catch (error) {
+    console.error("验证码登录出错:", error);
+    res.status(500).json({code: 500, data: null, msg: '服务器出错'});
+  }
+});
 
 // GET: 获取用户个人资料
 router.get('/profile', verifyAndRefreshTokens, async (req, res) => {
