@@ -29,8 +29,8 @@ router.post('/send-confirmation-code', async (req, res) => {
           .catch(error => console.error("Error sending email:", error));
     });
 
-    res.status(201).json({
-      code: 201,
+    res.status(200).json({
+      code: 200,
       msg: '确认码已发送到您的邮箱'
     });
   } catch (error) {
@@ -52,7 +52,7 @@ router.post('/register', async (req, res) => {
     const [existingUsers] = await db.query('SELECT id FROM users WHERE username = ?', [username]);
     console.log(existingUsers)
     if (existingUsers !== undefined) {
-      return res.status(409).json({code: 409, data: null, msg: '用户名已存在'});
+      return res.status(400).json({code: 400, data: null, msg: '用户名已存在'});
     }
 
     // 验证确认码
@@ -82,8 +82,8 @@ router.post('/register', async (req, res) => {
     await db.query('INSERT INTO users (username, password, name, email, email_confirmed,avatar) VALUES (?, ?, ?, ?,' +
         ' ?,?)', [username, hashedPassword, name, email, 1, defaultAvatar]);
 
-    res.status(201).json({
-      code: 201,
+    res.status(200).json({
+      code: 200,
       data: {username, email, name},
       msg: '用户注册成功'
     });
@@ -190,8 +190,8 @@ router.post('/request-login-code', async (req, res) => {
           .catch(error => console.error("发送验证码邮件时出错:", error));
     });
 
-    res.status(201).json({
-      code: 201,
+    res.status(200).json({
+      code: 200,
       msg: '验证码已发送到您的邮箱'
     });
   } catch (error) {
