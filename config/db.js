@@ -1,6 +1,11 @@
 // 在 config 文件夹内的 db.js
 const mysql = require('mysql2');
-require('dotenv').config();
+const path = require("path");
+
+// 根据环境动态选择 .env 文件路径
+const envPath = path.resolve(__dirname, '../.env'); // 本地环境的相对路径
+
+require('dotenv').config({path: envPath});
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,

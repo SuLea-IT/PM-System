@@ -1,6 +1,11 @@
 const nodemailer = require('nodemailer');
 const fs = require("fs");
-require('dotenv').config();
+const path = require("path");
+
+// 根据环境动态选择 .env 文件路径
+const envPath = path.resolve(__dirname, '../.env'); // 本地环境的相对路径
+
+require('dotenv').config({path: envPath});
 
 const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
@@ -17,7 +22,7 @@ const imageToBase64 = (filePath) => {
 };
 
 // 获取 Base64 编码的图片
-const image3Base64 = imageToBase64('public/images/email_bg.png');
+const image3Base64 = imageToBase64(path.join(__dirname, '..', 'public', 'images', 'email_bg.png'));
 // HTML 模板
 const templates = {
     confirmation: `
@@ -428,10 +433,11 @@ const sendEmail = async (to, subject, templateName, templateData) => {
         for (const key in templateData) {
             htmlToSend = htmlToSend.replace(new RegExp(`{{${key}}}`, 'g'), templateData[key]);
         }
+        let gif = path.resolve(__dirname, '../public/images/output.gif')
 
         const attachments = [{
             filename: 'output.gif',
-            path: 'public/images/output.gif',
+            path: gif,
             cid: 'image1' // 这里的cid需要与img标签中的cid匹配
         }];
 

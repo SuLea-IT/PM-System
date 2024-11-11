@@ -1,10 +1,14 @@
 // app.js
 const express = require('express');
-const path = require('path');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const cors = require('cors');
-require('dotenv').config(); // 确保加载环境变量
+const path = require("path");
+
+// 根据环境动态选择 .env 文件路径
+const envPath = path.resolve(__dirname, '../.env'); // 本地环境的相对路径
+
+require('dotenv').config({path: envPath});
 const apiRouter = require('./routes/api');
 const createError = require("http-errors");
 // 创建 Express 应用
@@ -20,8 +24,8 @@ app.use(logger('dev')); // 日志
 app.use(express.json()); // 解析 JSON 请求体
 app.use(express.urlencoded({extended: false})); // 解析 URL-encoded 请求体
 app.use(cookieParser()); // 解析 cookie
-app.use(express.static(path.join(__dirname, 'public'))); // 静态文件服务
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // 为 /uploads 路径提供静态文件服务
+// app.use(express.static(path.join(__dirname, 'public'))); // 静态文件服务
+app.use('/uploads', express.static(path.join(__dirname, '/uploads'))); // 为 /uploads 路径提供静态文件服务
 
 // 设置路由
 app.use('/api', apiRouter);
@@ -43,7 +47,7 @@ app.use(function (err, req, res, next) {
 });
 
 // 设置和启动服务器
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3177;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

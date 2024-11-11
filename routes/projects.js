@@ -20,69 +20,203 @@ const {
 const path = require("path");
 // 上传项目头像
 router.post('/upload-avatar/:id', verifyAndRefreshTokens, upload.single('avatar'), uploadAvatar('project'));
+/**
+ * 分页获取当前用户相关的项目列表
+ * GET /projects
+ * 查询参数:
+ * - page: 页码（默认1）
+ * - limit: 每页数量（默认5）
+ */
+// 获取当前用户相关的项目列表
+router.get('/', verifyAndRefreshTokens, async (req, res) => {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 8;
+    const offset = (page - 1) * limit;
+    const userId = req.user.id;
 
+    try {
+        // 查询当前用户相关的项目列表（创建者或成员）
+        const projectsResult = await db.query(
+            `SELECT DISTINCT p.id, p.name, p.description, p.created_by, u.name AS created_by_name, p.avatar, p.created_at
+             FROM projects p
+             LEFT JOIN project_members pm ON p.id = pm.project_id
+             LEFT JOIN users u ON p.created_by = u.id
+             WHERE p.created_by = ? OR pm.user_id = ?
+             LIMIT ? OFFSET ?`,
+            [userId, userId, limit, offset]
+        );
 
+        // 查询当前用户相关的项目总数
+        const countResult = await db.query(
+            `SELECT COUNT(DISTINCT p.id) AS total
+             FROM projects p
+             LEFT JOIN project_members pm ON p.id = pm.project_id
+             WHERE p.created_by = ? OR pm.user_id = ?`,
+            [userId, userId]
+        );
+
+        const projects = projectsResult;
+        const total = countResult[0]?.total || 0;
+
+        res.status(200).json({data: projects, total, page, limit});
+    } catch (error) {
+        console.error("获取项目列表错误详情:", error.message);
+        res.status(500).json({message: '获取项目列表失败'});
+    }
+});
+
+/**
+ * 根据项目名称分页搜索当前用户相关的项目
+ * GET /projects/search
+ * 查询参数:
+ * - name: 搜索的项目名称（必需）
+ * - page: 页码（默认1）
+ * - limit: 每页数量（默认5）
+ */
+router.get('/search', verifyAndRefreshTokens, async (req, res) => {
+    const {name, page = 1, limit = 8} = req.query;
+    const parsedPage = parseInt(page, 10);
+    const parsedLimit = parseInt(limit, 10);
+    const offset = (parsedPage - 1) * parsedLimit;
+    const userId = req.user.id;
+
+    if (!name) {
+        return res.status(400).json({message: '项目名称是必需的'});
+    }
+
+    try {
+        // 使用 LIKE 查询当前用户相关且名称包含指定字符串的项目，并获取创建者的名字
+        const projectsResult = await db.query(
+            `SELECT DISTINCT p.id, p.name, p.description, p.created_by, u.name AS created_by_name, p.avatar, p.created_at
+             FROM projects p
+             LEFT JOIN project_members pm ON p.id = pm.project_id
+             LEFT JOIN users u ON p.created_by = u.id  -- 添加用户表连接
+             WHERE (p.created_by = ? OR pm.user_id = ?) AND p.name LIKE ?
+             LIMIT ? OFFSET ?`,
+            [userId, userId, `%${name}%`, parsedLimit, offset]
+        );
+
+        // 查询符合条件的项目总数
+        const countResult = await db.query(
+            `SELECT COUNT(DISTINCT p.id) AS total
+             FROM projects p
+             LEFT JOIN project_members pm ON p.id = pm.project_id
+             WHERE (p.created_by = ? OR pm.user_id = ?) AND p.name LIKE ?`,
+            [userId, userId, `%${name}%`]
+        );
+
+        const projects = projectsResult;
+        const total = countResult[0]?.total || 0;
+
+        res.status(200).json({
+            data: projects,
+            total,
+            currentPage: parsedPage,
+            pageSize: parsedLimit
+        });
+    } catch (error) {
+        console.error("搜索项目信息错误详情:", error.message);
+        res.status(500).json({message: '获取项目信息失败'});
+    }
+});
 // 获取项目信息
 router.get('/:projectId/info', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {projectId} = req.params;
 
-        // 获取项目基本信息
-        const [project] = await db.query('SELECT avatar,name, description, created_by, created_at FROM projects WHERE' +
-            ' id' +
-            ' = ?', [projectId]);
+        // 获取项目基本信息，明确使用 projects 表的 avatar
+        const [project] = await db.query(
+            `SELECT p.avatar, p.name, p.description, p.created_by, p.created_at, u.name AS created_by_name
+             FROM projects p
+                      LEFT JOIN users u ON p.created_by = u.id -- 获取项目创建者的名字
+             WHERE p.id = ?`,
+            [projectId]
+        );
+
         if (!project) {
             return res.status(404).json({code: 404, msg: '项目未找到'});
         }
 
+        // 获取项目任务统计信息
+        const [projectStats] = await db.query(
+            `SELECT single_gene_projection, gene_set_projection, clustering
+             FROM project_stats
+             WHERE project_id = ?`,
+            [projectId]
+        );
+
         // 获取项目管理员信息
-        const [adminResult] = await db.query('SELECT users.id, users.name, users.email FROM users JOIN project_members ON users.id = project_members.user_id WHERE project_members.project_id = ? AND project_members.role = "admin"', [projectId]);
+        const [adminResult] = await db.query(
+            `SELECT users.id, users.name, users.email
+             FROM users
+                      JOIN project_members ON users.id = project_members.user_id
+             WHERE project_members.project_id = ?
+               AND project_members.role = "admin"`,
+            [projectId]
+        );
         const admin = adminResult[0];
 
         // 获取所有项目成员信息
-        const members = await db.query('SELECT users.id,users.username, users.name, users.email, project_members.role' +
-            ' FROM' +
-            ' users JOIN project_members ON users.id = project_members.user_id WHERE project_members.project_id = ?', [projectId]);
+        const members = await db.query(
+            `SELECT users.id, users.username, users.name, users.email, project_members.role
+             FROM users
+                      JOIN project_members ON users.id = project_members.user_id
+             WHERE project_members.project_id = ?`,
+            [projectId]
+        );
 
         res.status(200).json({
             code: 200,
             data: {
                 project,
+                projectStats,  // 新增的项目统计数据
                 admin,
                 members
             },
             msg: '项目信息获取成功'
         });
     } catch (error) {
-        console.error("Get project info error:", error);
         res.status(500).json({code: 500, data: null, msg: '服务出错'});
     }
 });
+
+
 // 创建新项目并设定创建用户为管理员
 router.post('/create', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {name, description} = req.body;
         const userId = req.user.id;
-        let avatarUrl = process.env.APP_URL
+
+        // 设置项目默认头像（您可以根据需要修改）
+        let avatarUrl = process.env.APP_URL;
         avatarUrl = path.join(avatarUrl, 'uploads', 'avatar', 'default.jpg');
         const defaultAvatar = avatarUrl;
+
         // 插入项目数据
-        const result = await db.query('INSERT INTO projects (name, description, created_by,avatar) VALUES (?, ?,' +
-            ' ?,?)', [name, description, userId, defaultAvatar]);
+        const result = await db.query('INSERT INTO projects (name, description, created_by, avatar) VALUES (?, ?, ?, ?)',
+            [name, description, userId, defaultAvatar]);
 
         if (!result || !result.insertId) {
             throw new Error('项目创建失败');
         }
 
         const projectId = result.insertId;
+
         // 插入项目成员数据
-        await db.query('INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?)', [projectId, userId, 'admin']);
-        res.status(201).json({code: 201, data: {projectId}, msg: '项目创建成功'});
+        await db.query('INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?)',
+            [projectId, userId, 'admin']);
+
+        // 插入项目任务统计数据（所有任务默认为0）
+        await db.query('INSERT INTO project_stats (project_id, single_gene_projection, gene_set_projection, clustering) VALUES (?, 0, 0, 0)',
+            [projectId]);
+
+        res.status(200).json({code: 200, data: {projectId}, msg: '项目创建成功'});
     } catch (error) {
         console.error("Project creation error:", error);
         res.status(500).json({code: 500, data: null, msg: '服务出错'});
     }
 });
+
 
 // 修改项目信息
 router.put('/:projectId', verifyAndRefreshTokens, async (req, res) => {
@@ -109,6 +243,12 @@ router.delete('/:projectId', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {projectId} = req.params;
 
+        // 删除项目邀请记录
+        await db.query('DELETE FROM project_invitations WHERE project_id = ?', [projectId]);
+
+        // 删除项目任务统计数据
+        await db.query('DELETE FROM project_stats WHERE project_id = ?', [projectId]);
+
         // 删除项目成员
         await db.query('DELETE FROM project_members WHERE project_id = ?', [projectId]);
 
@@ -122,12 +262,14 @@ router.delete('/:projectId', verifyAndRefreshTokens, async (req, res) => {
             return res.status(404).json({code: 404, msg: '项目未找到'});
         }
 
-        res.status(200).json({code: 200, msg: '项目删除成功'});
+        res.status(200).json({code: 200, msg: '项目解散成功'});
     } catch (error) {
         console.error("Project deletion error:", error);
         res.status(500).json({code: 500, data: null, msg: '服务出错'});
     }
 });
+
+
 // 获取项目文件信息
 router.get('/:projectId/files', verifyAndRefreshTokens, async (req, res) => {
     try {
@@ -173,7 +315,7 @@ router.post('/:projectId/apply', verifyAndRefreshTokens, async (req, res) => {
         // 创建新的申请记录
         const applicationId = await createProjectApplication(projectId, userId);
 
-        res.status(201).json({code: 201, data: {applicationId}, msg: '申请已提交'});
+        res.status(200).json({code: 200, data: {applicationId}, msg: '申请已提交'});
     } catch (error) {
         console.error("Project application error:", error);
         res.status(500).json({code: 500, data: null, msg: '服务出错'});
@@ -219,17 +361,12 @@ router.put('/applications/:applicationId', verifyAndRefreshTokens, async (req, r
 router.post('/:projectId/invite', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {projectId} = req.params;
-        const {email} = req.body;
-        const userId = req.body.userid;
+        const users = req.body; // req.body是一个数组，包含多个用户的email和userid
+        console.log(req.body);
 
-        // 获取用户信息
-        const [user] = await db.query('SELECT username FROM users WHERE id = ? AND email = ?', [userId, email]);
-
-        if (user == undefined) {
-            return res.status(404).json({code: 404, msg: '用户未找到或邮箱不匹配'});
+        if (!Array.isArray(users) || users.length === 0) {
+            return res.status(400).json({code: 400, msg: '请求数据格式错误或无用户信息'});
         }
-
-        const username = user.username;
 
         // 获取项目信息
         const [project] = await db.query('SELECT name, created_by FROM projects WHERE id = ?', [projectId]);
@@ -248,37 +385,56 @@ router.post('/:projectId/invite', verifyAndRefreshTokens, async (req, res) => {
 
         const projectOwnerUsername = projectOwner.username;
 
-        // 生成唯一令牌
-        const token = crypto.randomBytes(16).toString('hex');
+        // 循环处理每个用户
+        for (const user of users) {
+            const {email, userid} = user;
 
-        // 存储邀请信息
-        await db.query('INSERT INTO project_invitations (project_id, email, token) VALUES (?, ?, ?)', [projectId, email, token]);
+            // 获取用户信息
+            const [dbUser] = await db.query('SELECT username FROM users WHERE id = ? AND email = ?', [userid, email]);
 
-        // 发送邀请邮件
-        const inviteLink = `${process.env.APP_URL}/api/projects/${projectId}/accept-invite?token=${token}`;
-        const topLink = `${process.env.APP_URL}/api/projects/${projectId}/accept-invite?`
-        const tokenLink = `token=${token}`
-        setImmediate(() => {
-            sendEmail(email, '项目邀请', 'invitation', {
-                title: '项目邀请',
-                inviteLink: inviteLink,
-                tokenLink: tokenLink,
-                topLink: topLink,
-                username: username,
-                projectName: projectName,
-                projectOwnerUsername: projectOwnerUsername
-            }).catch(error => console.error("Error sending email:", error));
-        });
+            if (dbUser == undefined) {
+                // 如果用户信息不匹配，返回404错误
+                return res.status(404).json({code: 404, msg: `用户 ${email} 未找到或邮箱不匹配`});
+            }
 
-        res.status(201).json({
-            code: 201,
+            const username = dbUser.username;
+
+            // 生成唯一令牌
+            const token = crypto.randomBytes(16).toString('hex');
+
+            // 存储邀请信息
+            await db.query('INSERT INTO project_invitations (project_id, email, token) VALUES (?, ?, ?)', [projectId, email, token]);
+
+            // 发送邀请邮件
+            const inviteLink = `${process.env.APP_URL}/api/projects/${projectId}/accept-invite?token=${token}`;
+            const topLink = `${process.env.APP_URL}/api/projects/${projectId}/accept-invite?`;
+            const tokenLink = `token=${token}`;
+
+            // 发送邮件
+            setImmediate(() => {
+                sendEmail(email, '项目邀请', 'invitation', {
+                    title: '项目邀请',
+                    inviteLink: inviteLink,
+                    tokenLink: tokenLink,
+                    topLink: topLink,
+                    username: username,
+                    projectName: projectName,
+                    projectOwnerUsername: projectOwnerUsername
+                }).catch(error => console.error("Error sending email:", error));
+            });
+        }
+
+        res.status(200).json({
+            code: 200,
             msg: '邀请链接已发送到成员邮箱'
         });
+
     } catch (error) {
         console.error("Send invite link error:", error);
         res.status(500).json({code: 500, data: null, msg: '服务出错'});
     }
 });
+
 
 // 接受邀请链接
 router.get('/:projectId/accept-invite', async (req, res) => {

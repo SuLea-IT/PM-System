@@ -50,7 +50,6 @@ router.post('/register', async (req, res) => {
     }
 
     const [existingUsers] = await db.query('SELECT id FROM users WHERE username = ?', [username]);
-    console.log(existingUsers)
     if (existingUsers !== undefined) {
       return res.status(400).json({code: 400, data: null, msg: '用户名已存在'});
     }
@@ -139,7 +138,14 @@ router.post('/login', async (req, res) => {
           accessToken,
           refreshToken,
           refreshTokenExpiresAt: expiresAtGMT8,
-          user: {id: user.id, username: user.username, name: user.name, email: user.email, role: user.role}
+          user: {
+            id: user.id,
+            username: user.username,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            avatar: user.avatar
+          }
         },
         msg: '登录成功'
       });
@@ -260,7 +266,14 @@ router.post('/login-with-code', async (req, res) => {
         accessToken,
         refreshToken,
         refreshTokenExpiresAt: expiresAtGMT8,
-        user: {id: user.id, username: user.username, name: user.name, email: user.email, role: user.role}
+        user: {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          avatar: user.avatar
+        }
       },
       msg: '登录成功'
     });
@@ -296,5 +309,119 @@ router.get('/profile', verifyAndRefreshTokens, async (req, res) => {
     res.status(500).json({msg: '服务器错误', error: error.message});
   }
 });
+// 获取排除自己所有用户信息
+router.get('/exclude-self', verifyAndRefreshTokens, async (req, res) => {
+  try {
+    const userId = req.user.id; // 当前用户的ID
+    const projectId = req.query.project_id; // 从请求中获取项目ID，假设传递在 query 参数中
 
+    console.log(req.user.id, projectId);
+
+    // 查询所有用户，排除当前用户和当前项目的成员
+    const users = await db.query(
+        `SELECT id, username, name, email, role, avatar 
+       FROM users 
+       WHERE id != ? 
+         AND id NOT IN (
+           SELECT user_id 
+           FROM project_members 
+           WHERE project_id = ?
+         )`,
+        [userId, projectId]
+    );
+
+    // 检查是否有用户数据
+    if (users.length === 0) {
+      return res.status(404).json({code: 404, msg: '没有其他用户'});
+    }
+
+    // 返回用户信息
+    res.status(200).json({
+      code: 200,
+      data: users,
+      msg: '获取用户信息成功',
+    });
+  } catch (error) {
+    console.error('获取用户信息出错:', error);
+    res.status(500).json({code: 500, msg: '服务器错误', error: error.message});
+  }
+});
+
+// GET: 根据name或邮箱搜索用户
+router.get('/search-users', async (req, res) => {
+  try {
+    const {name, email} = req.query; // 获取查询参数
+
+    if (!name && !email) {
+      return res.status(400).json({code: 400, msg: '缺少必要的查询字段（name或email）'});
+    }
+
+    // 构建查询条件
+    let query = 'SELECT id, username, name, email, role, avatar FROM users WHERE';
+    let queryParams = [];
+
+    if (name) {
+      query += ' name LIKE ?';  // 模糊查询name
+      queryParams.push(`%${name}%`);
+    }
+
+    if (email) {
+      if (name) query += ' AND';  // 如果有name查询，添加AND条件
+      query += ' email LIKE ?';  // 模糊查询email
+      queryParams.push(`%${email}%`);
+    }
+
+    // 执行查询
+    const [users] = await db.query(query, queryParams);
+
+    // 检查是否有用户数据
+    if (users.length === 0) {
+      return res.status(404).json({code: 404, msg: '没有找到符合条件的用户'});
+    }
+
+    // 返回查询结果
+    res.status(200).json({
+      code: 200,
+      data: users,
+      msg: '搜索成功'
+    });
+  } catch (error) {
+    console.error('搜索用户时出错:', error);
+    res.status(500).json({code: 500, msg: '服务器错误', error: error.message});
+  }
+});
+
+// GET: 获取用户ID个人资料
+router.get('/userprofile', async (req, res) => {
+  try {
+    const {userId} = req.query;
+    if (!userId) {
+      return res.status(400).json({msg: '用户ID未提供'});
+    }
+
+    const user = await db.findUserById(userId);
+    if (!user) {
+      return res.status(404).json({msg: '用户不存在'});
+    }
+
+
+    res.json({
+      code: 200,
+      data: {
+        user: {
+          id: user.id,
+          username: user.username,
+          avatar: user.avatar,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        }
+      },
+      msg: '获取成功'
+    });
+  } catch (error) {
+    console.error('Profile retrieval error:', error);
+    res.status(500).json({msg: '服务器错误', error: error.message});
+  }
+});
 module.exports = router;
