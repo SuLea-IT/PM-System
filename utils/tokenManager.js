@@ -30,7 +30,7 @@ const verifyAndRefreshTokens = (req, res, next) => {
             if (err.name === 'TokenExpiredError' && refreshToken) {
                 jwt.verify(refreshToken, jwtConfig.refreshTokenSecret, (err, decoded) => {
                     if (err) {
-                        return res.status(403).json({msg: '刷新令牌无效'});
+                        return res.status(403).json({code: 403, msg: '刷新令牌无效'});
                     }
                     // 生成新的令牌并更新响应头
                     const newTokens = generateTokens({id: decoded.id, role: decoded.role, status: decoded.status}); // 包含角色
@@ -41,7 +41,7 @@ const verifyAndRefreshTokens = (req, res, next) => {
                     next();
                 });
             } else {
-                return res.status(403).json({msg: '访问令牌无效'});
+                return res.status(403).json({code: 403, msg: '访问令牌无效'});
             }
         } else {
             req.user = decoded; // 包含用户的角色信息

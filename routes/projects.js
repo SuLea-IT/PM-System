@@ -243,19 +243,24 @@ router.delete('/:projectId', verifyAndRefreshTokens, async (req, res) => {
     try {
         const {projectId} = req.params;
 
-        // 删除项目邀请记录
+        // 按照外键依赖关系,从子表开始删除
+
+        // 1. 删除项目邀请记录
         await db.query('DELETE FROM project_invitations WHERE project_id = ?', [projectId]);
 
-        // 删除项目任务统计数据
+        // 2. 删除项目任务统计数据
         await db.query('DELETE FROM project_stats WHERE project_id = ?', [projectId]);
 
-        // 删除项目成员
+        // 3. 删除项目成员
         await db.query('DELETE FROM project_members WHERE project_id = ?', [projectId]);
 
-        // 删除项目相关的文件
+        // 4. 删除项目相关的文件
         await db.query('DELETE FROM files WHERE project_id = ?', [projectId]);
 
-        // 删除项目
+        // 5. 删除项目相关的目录(新增)
+        await db.query('DELETE FROM directories WHERE project_id = ?', [projectId]);
+
+        // 6. 最后删除项目主表
         const result = await db.query('DELETE FROM projects WHERE id = ?', [projectId]);
 
         if (result.affectedRows === 0) {

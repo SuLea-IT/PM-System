@@ -111,12 +111,12 @@ router.post('/login', async (req, res) => {
 
     // 检查邮箱是否确认
     if (user.email_confirmed !== 1) {
-      return res.status(403).json({code: 403, data: null, msg: '邮箱未确认'});
+      return res.status(400).json({code: 403, data: null, msg: '邮箱未确认'});
     }
 
     // 检查用户的 status 是否为 1，若不为 1 则阻止登录
     if (user.status !== 1) {
-      return res.status(403).json({code: 403, data: null, msg: '因操作原因已被封禁，请联系管理员'});
+        return res.status(400).json({code: 403, data: null, msg: '因操作原因已被封禁，请联系管理员'});
     }
 
     // 验证密码
